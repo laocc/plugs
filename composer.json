@@ -1,0 +1,29 @@
+{
+      "name": "laocc/plugs",
+      "description": " Some PHP with a small tool",
+      "version": "v1.0.1",
+      "require": {
+            "php": ">=5.5.0"
+      },
+      "authors": [
+            {
+                  "name": "LaoCC",
+                  "email": "fazo@qq.com"
+            }
+      ],
+      "keywords": [
+            "image",
+            "picture",
+            "code"
+      ],
+      "support": {
+            "source": "https://github.com/laocc/gds"
+      },
+      "autoload": {
+            "psr-4": {
+                  "laocc\\plugs\\": "kernel/"
+            }
+      },
+      "type": "library",
+      "license": "LGPL"
+}
