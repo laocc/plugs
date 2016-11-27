@@ -1,7 +1,6 @@
 {
       "name": "laocc/plugs",
       "description": " Some PHP with a small tool",
-      "version": "v1.0.1",
       "require": {
             "php": ">=5.5.0"
       },
