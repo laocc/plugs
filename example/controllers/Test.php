@@ -1,10 +1,35 @@
 <?php
 namespace demo;
 
+use laocc\plugs\Async;
 use laocc\plugs\Debug;
 
 class TestController
 {
+
+    public function async()
+    {
+        $url = 'http://plugs.kaibuy.top/server.php';
+
+        $data = [
+            'value' => '中华人民共和国中华人民共和国中华人民共和国中华人民共和国中华人民共和国中华人民共和国中华人民共和国中华人民共和国中华人民共和国中华人民共和国中华人民共和国',
+            'a', 'b', 'c', 'a'
+        ];
+
+//        print_r($_SERVER);
+
+        $call = function ($index, $val) {
+            var_dump($index);
+            var_dump($val);
+        };
+
+        $async = new Async($url);
+//        $async->call($url, 'test', $data, $call);
+//        $async->call($url, 'test', '中华人民共和国', $call);
+//        $async->send();
+
+        var_dump($async->test('abc'));
+    }
 
     public function debug()
     {

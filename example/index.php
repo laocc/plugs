@@ -23,13 +23,17 @@ function nav()
     <title>LaoCC Plugs 测试</title>
     <ul>
         <li><a href="/?action=debug">Debug</a></li>
+        <li><a href="/?action=async">Async</a></li>
     </ul>
 HTML;
 }
 
 
-nav();
-if (in_array($action, ['debug'])) {
+if (in_array($action, ['debug', 'async'])) {
+    nav();
+    $obj = new \demo\TestController();
+    $obj->{$action}();
+} elseif (in_array($action, ['asyncTest'])) {
     $obj = new \demo\TestController();
     $obj->{$action}();
 }

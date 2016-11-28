@@ -47,6 +47,12 @@ class Password
         return !!$double ? md5(implode($re)) : implode($re);
     }
 
+    /**
+     * 校验md3
+     * @param $string
+     * @param $password
+     * @return bool
+     */
     public static function md3_verify($string, $password)
     {
         if (strlen(trim($string)) === 32 and strlen(trim($password)) !== 32) {
