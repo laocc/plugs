@@ -16,13 +16,15 @@ class Debug
     private static $_node_len = 0;
     private static $_file_len = 0;
 
-    public static function star($path)
+    public static function star($path = null)
     {
         self::init($path);
     }
 
-    public static function init($path)
+    public static function init($path = null)
     {
+        if (is_null($path)) $path = (__DIR__ . '/../../../../debug/');
+
         $trace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT | DEBUG_BACKTRACE_IGNORE_ARGS);
         self::$_trace = array_reverse($trace);
 
@@ -51,11 +53,13 @@ class Debug
     {
         if (self::$_state === false) return;
         $prev = $prev ?: debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT | DEBUG_BACKTRACE_IGNORE_ARGS, 1)[0];
+        $file = null;
         if (isset($prev['file'])) {
-            $file = $prev['file'] . " [{$prev['line']}]";
-        } else {
-            $file = null;
+            if ($prev['file'] !== __FILE__) {
+                $file = $prev['file'] . " [{$prev['line']}]";
+            }
         }
+        if (is_array($msg)) $msg = json_encode($msg, 256);
         self::$_node_len = max(iconv_strlen($msg), self::$_node_len);
         self::$_file_len = max(iconv_strlen($file), self::$_file_len);
         $nowMemo = memory_get_usage();
@@ -146,7 +150,7 @@ class Debug
         if (is_null(self::$_log_path)) return null;
         if (!is_null($_filename)) return $_filename;
 
-        @mkdir(self::$_log_path, 0740, true);
+        if (!is_dir(self::$_log_path)) @mkdir(self::$_log_path, 0740, true);
         $path = realpath(self::$_log_path) . '/';
 
         if (!$name) {
