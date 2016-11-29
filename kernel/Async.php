@@ -3,14 +3,14 @@ namespace laocc\plugs;
 
 class Async
 {
-    private $_timeout = 10;
+    private $_option = [];
     private $_url = [];
     private $_index = 0;
     private $_post_key = ['__async_action_', '__async_data_'];
-    private $_token = 'myToken';
     private $_isServer = false;
     private $_isAsync = true;
     private $_server;
+    private $_protect = ['indexAction', 'getRequest', 'getResponse', 'getModuleName', 'getView', 'initView', 'setViewpath', 'getViewpath', 'forward', 'redirect', 'getInvokeArgs', 'getInvokeArg'];
 
     public function __construct($sev = true)
     {
@@ -19,11 +19,127 @@ class Async
             $this->_server = $sev;
         } elseif (is_bool($sev) or is_int($sev)) {
             $this->_isAsync = boolval($sev);
-        } elseif (preg_match('/^https?\:\/\/[\w\.]+\.[a-z]+\/.+$/i', $sev)) {
+        } elseif ($this->is_url($sev)) {
             $this->_url[0] = $sev;
         } else {
             throw new \Exception('若需要客户端请提供布尔型或一个网址URL参数，若需要服务器端请提供实例类对象参数，而当前参数不是这三种类型的值。');
         }
+    }
+
+    /**
+     * 是否可用接口，并返回各部分数据
+     * @param $url
+     * @param null $match
+     * @return int
+     */
+    private function is_url($url, &$match = null)
+    {
+        return preg_match('/^(https?)\:\/{2}([a-z][\w\.]+\.[a-z]{2,10})(?:\:(\d+))?(\/.+)$/i', $url, $match);
+    }
+
+    private function get_protect()
+    {
+        static $protect;
+        if (!is_null($protect)) return $protect;
+        $protect = $this->protect;
+        if (empty($protect)) {
+            $protect = [];
+        } elseif (is_string($protect)) {
+            $protect = explode(',', $protect);
+        }
+        $protect += $this->_protect;
+        return $protect;
+    }
+
+    /**
+     * 显示async服务端所有可用接口
+     * @param $object
+     */
+    private function display_server($trace)
+    {
+        if (!is_object($this->_server)) return;
+        $fun = [];
+        $class = get_class($this->_server);
+        foreach (get_class_methods($class) as $method) {
+            if ($this->action and !preg_match("/.+{$this->action}$/i", $method)) continue;
+            $fun[$method] = $method;
+        }
+        if (empty($fun)) return;
+
+
+        $self = get_class() . '/listen';
+        $file = null;
+        foreach ($trace as $trc) {
+            if (!isset($trc['object'])) continue;
+
+            if (!is_null($file)) {//已过了入口，查找最终调用者
+                if (get_class($trc['object']) === $class) {
+                    if (isset($trc['file'])) $file = $trc['file'];//记录最新调用者
+                }
+                if (get_class($trc['object']) !== $class) {
+                    break;//不是调用者，返回最近调用者
+                }
+                continue;//得到过文件名
+            }
+
+            if ("{$trc['class']}/{$trc['function']}" === $self and isset($trc['file'])) {
+                $file = $trc['file'];//进入本程序的入口
+            }
+            if (get_class($trc['object']) === $class) {
+                $file = $trc['file'];//调用接口者
+                break;
+            }//不是真实调用者，继续查找
+        }
+
+        if (is_null($file)) return;
+        $code = file_get_contents($file);
+        if (empty($code)) return;
+        $html = <<<HTML
+<!DOCTYPE html><html lang="zh-cn"><head>
+    <meta charset="UTF-8">
+    <style>
+    body {margin: 0;padding: 0;font-size: %s;color:#333;font-family:"Source Code Pro", "Arial", "Microsoft YaHei", "msyh", "sans-serif";}
+div.nav{width:100%;height:2em;line-height:2em;font-size:2em;background:#17728A;color:#eee;text-indent:1em;border-bottom:2px solid #FFD82F;}
+div.item{clear:both;margin:1em;}
+div.head{width:100%;height:2em;line-height:2em;background:#50AC74;color:#fff;text-indent:1em;}
+pre{margin:0;text-indent:2em;background: #F4FFFC;border:1px solid #50AC74;padding:0.5em 0;}
+form{margin:5em;}
+label{float:left;height:28px;line-height:28px;}
+input{float:left;padding:0;margin:0;border: 1px solid #333;}
+input[type=text]{width:10em;height:26px;}
+input[type=submit]{width:5em;border-left:0;height:28px;background:#17728A;color:#fff;}
+input[type=submit]:hover{background:#17588A;color:#f00;}
+h3{width:100%;text-align:center;margin-top:10em;}
+</style>
+    <title>接口参数</title>
+</head><body>
+HTML;
+        echo $html, "<div class='nav'>{$class} Interface</div>";
+
+        if (is_null($this->password)) {
+            echo '<h3>当前接口未设置查看密码，不能查看接口信息。请在创建async服务器时指定密码，如：$async->password = \'password\';</h3>';
+            return;
+        }
+
+        if (!isset($_GET['pwd']) or $_GET['pwd'] !== $this->password) {
+            $form = <<<HTML
+<form action="./" method="get">
+<label for="pwd">请输入接口查看密码：</label>
+<input type="text" name="pwd" id="pwd" value="" autocomplete="off">
+<input type="submit" value="进入">
+</form>
+HTML;
+            echo $form, (isset($_GET['pwd']) ? '<label style="color:red;margin-left:2em;">密码错误</label>' : '');
+            return;
+        }
+
+        preg_match_all('/(\/\*\*(?:.+?)\*\/).+?function\s+(\w+?)\((.*?)\)/is', $code, $match, PREG_SET_ORDER);
+        foreach ($match as $item) {
+            if (!in_array($item[2], $fun)) continue;
+            echo "<div class='item'><div class='head'>{$item[2]}({$item[3]})</div><pre>{$item[1]}</pre></div>";
+        }
+
+        echo '</body></html>';
     }
 
 
@@ -32,23 +148,29 @@ class Async
      */
     public function listen()
     {
-        if (empty($_POST)) return;
-        if (!$this->_isServer) throw new \Exception('当前Async对象是客户端，不可调用send方法');
+        if (getenv('REQUEST_METHOD') === 'GET') {
+            $this->display_server(debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT | DEBUG_BACKTRACE_IGNORE_ARGS));
+            exit;
+        }
+
+        if (empty($_POST)) exit;
+        if (!$this->_isServer) throw new \Exception('当前Async对象是服务器端，不可调用listen方法');
 
         $action = isset($_POST[$this->_post_key[0]]) ? $_POST[$this->_post_key[0]] : null;
         $data = isset($_POST[$this->_post_key[1]]) ? $_POST[$this->_post_key[1]] : null;
-        if (is_null($data)) return;
+        if (is_null($data)) exit;
+        if (strpos($action, '_') === 0) exit(serialize('禁止调用系统方法'));
+        $action .= $this->action;
 
         $agent = getenv('HTTP_USER_AGENT');
-        if (!$agent) return;
+        if (!$agent) exit;
         $host = getenv('HTTP_HOST');
-        if (!hash_equals(md5("{$host}:{$data}/{$this->_token}"), $agent)) return;
+        if (!hash_equals(md5("{$host}:{$data}/{$this->token}"), $agent)) exit(serialize('TOKEN验证失败'));
         if (!method_exists($this->_server, $action) or !is_callable([$this->_server, $action])) {
-            throw new \Exception("{$action} 方法不存在");
+            exit(serialize("当前服务端不存在{$action}方法。"));
         }
         $data = unserialize($data);
         if (!is_array($data)) $data = [$data];
-
 
         ob_start();
         $v = $this->_server->{$action}(...$data + array_fill(0, 10, null));
@@ -61,13 +183,19 @@ class Async
             echo serialize($v);
         }
         ob_flush();
+        exit;
     }
 
     /*===========================================client=============================================================*/
 
-    public function timeout($sec)
+    public function __set(string $name, $value)
     {
-        $this->_timeout = $sec;
+        $this->_option[$name] = $value;
+    }
+
+    public function __get($name)
+    {
+        return isset($this->_option[$name]) ? $this->_option[$name] : null;
     }
 
     /**
@@ -111,17 +239,15 @@ class Async
 
     private function realUrl($url, $action, $data)
     {
-        $info = explode('/', $url, 4);
-        if (count($info) < 4) throw new \Exception("请求调用地址不是一个合法的URL");
-        list($host, $port) = explode(':', $info[2] . ':80');
+        if (!$this->is_url($url, $info)) throw new \Exception("请求调用地址不是一个合法的URL");
         $_data = [$this->_post_key[0] => $action, $this->_post_key[1] => $data = serialize($data)];
         return [
-            'version' => (strtoupper($info[0]) === 'HTTPS') ? 'HTTP/2.0' : 'HTTP/1.1',
-            'host' => $host,
-            'port' => intval($port),
-            'uri' => "/{$info[3]}",
+            'version' => (strtoupper($info[1]) === 'HTTPS') ? 'HTTP/2.0' : 'HTTP/1.1',
+            'host' => $info[2],
+            'port' => intval($info[3] ?: 80),
+            'uri' => "/{$info[4]}",
             'url' => $url,
-            'agent' => md5("{$host}:{$data}/{$this->_token}"),
+            'agent' => md5("{$info[2]}:{$data}/{$this->token}"),
             'data' => $_data,
         ];
     }
@@ -142,7 +268,7 @@ class Async
             $error_call = $item['error_call'] ?: $error_call;
             if (is_null($success_call) and $this->_isAsync === false) throw new \Exception('非异步请求，必须提供处理返回数据的回调函数');
 
-            $fp = fsockopen($item['host'], $item['port'], $err_no, $err_str, $this->_timeout);
+            $fp = fsockopen($item['host'], $item['port'], $err_no, $err_str, intval($this->timeout ?: 1));
             if (!$fp) {
                 if (!is_null($error_call)) {
                     $error_call($index, $err_no, $err_str);
